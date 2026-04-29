@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cronômetro — IA Builder</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #25252d;
+      color: #f9f5fd;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 20px 48px;
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 520px;
+      aspect-ratio: 1;
+      max-height: min(92vh, 560px);
+      position: relative;
+      background: #0e0e13;
+      overflow: hidden;
+      flex-shrink: 0;
+      border-radius: 4px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    .panel__bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(143, 245, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(143, 245, 255, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    .panel__vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse 85% 75% at 50% 50%, transparent 0%, rgba(14, 14, 19, 0.88) 100%);
+    }
+
+    .hud-corner {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border-color: rgba(143, 245, 255, 0.45);
+      z-index: 2;
+      pointer-events: none;
+    }
+    .hud-corner--tl { top: 20px; left: 20px; border-top: 2px solid; border-left: 2px solid; }
+    .hud-corner--tr { top: 20px; right: 20px; border-top: 2px solid; border-right: 2px solid; }
+    .hud-corner--bl { bottom: 20px; left: 20px; border-bottom: 2px solid; border-left: 2px solid; }
+    .hud-corner--br { bottom: 20px; right: 20px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    .panel__inner {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      padding: 28px 24px 22px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hud-label {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #8ff5ff;
+      opacity: 0.75;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .hud-label__line {
+      display: block;
+      width: 24px;
+      height: 1px;
+      background: #8ff5ff;
+      opacity: 0.55;
+    }
+
+    .panel__body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      width: 100%;
+      gap: 16px;
+    }
+
+    .time-display {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: clamp(3.2rem, 14vw, 4.5rem);
+      line-height: 1;
+      letter-spacing: -0.03em;
+      color: #f9f5fd;
+      text-shadow: 0 0 24px rgba(143, 245, 255, 0.35);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .time-display--warn {
+      color: #ff9f43;
+      text-shadow: 0 0 28px rgba(255, 159, 67, 0.45);
+    }
+
+    .time-display--critical {
+      color: #ff6b6b;
+      animation: pulse-text 0.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse-text {
+      50% { opacity: 0.82; transform: scale(1.02); }
+    }
+
+    .sub {
+      font-size: 14px;
+      line-height: 1.45;
+      color: rgba(249, 245, 253, 0.65);
+      max-width: 340px;
+    }
+
+    .glass {
+      width: 100%;
+      background: rgba(19, 19, 25, 0.65);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(143, 245, 255, 0.12);
+      border-radius: 4px;
+      padding: 18px 16px 16px;
+      text-align: center;
+    }
+
+    .duration-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .duration-row input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .duration-btn {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 72px;
+      padding: 10px 14px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(143, 245, 255, 0.85);
+      background: rgba(143, 245, 255, 0.06);
+      border: 1px solid rgba(143, 245, 255, 0.2);
+      border-radius: 4px;
+      transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+    }
+
+    .duration-btn:hover {
+      background: rgba(143, 245, 255, 0.1);
+      border-color: rgba(143, 245, 255, 0.35);
+    }
+
+    .duration-row input:focus-visible + .duration-btn {
+      outline: 2px solid #8ff5ff;
+      outline-offset: 2px;
+    }
+
+    .duration-row input:checked + .duration-btn {
+      color: #0e0e13;
+      background: linear-gradient(135deg, #8ff5ff 0%, #5ed4e8 100%);
+      border-color: rgba(143, 245, 255, 0.6);
+      box-shadow: 0 0 20px rgba(143, 245, 255, 0.25);
+    }
+
+    .duration-row input:disabled + .duration-btn {
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .progress-track {
+      height: 4px;
+      background: rgba(143, 245, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 100%;
+      transform-origin: left center;
+      background: linear-gradient(90deg, #8ff5ff, #c47fff);
+      border-radius: 2px;
+      transition: transform 0.25s linear;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 12px 20px;
+      transition: transform 0.12s, box-shadow 0.12s, opacity 0.12s;
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn--primary {
+      color: #fff;
+      background: linear-gradient(135deg, #ff9f43 0%, #ff7a1a 56%, #f25c05 100%);
+      box-shadow: 0 8px 24px rgba(255, 122, 26, 0.28);
+    }
+
+    .btn--primary:hover:not(:disabled) {
+      box-shadow: 0 10px 30px rgba(255, 122, 26, 0.38);
+    }
+
+    .btn--ghost {
+      color: #8ff5ff;
+      background: rgba(143, 245, 255, 0.08);
+      border: 1px solid rgba(143, 245, 255, 0.22);
+    }
+
+    .btn--ghost:hover:not(:disabled) {
+      background: rgba(143, 245, 255, 0.14);
+    }
+
+    .panel-footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(143, 245, 255, 0.08);
+      flex-shrink: 0;
+    }
+
+    .brand {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #8ff5ff;
+    }
+
+    .status-chip {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(172, 170, 177, 0.65);
+    }
+
+    /* Alarme */
+    .alarm-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(255, 80, 80, 0.35) 0%, rgba(255, 0, 0, 0.12) 45%, transparent 70%);
+      mix-blend-mode: screen;
+    }
+
+    body.alarm .alarm-overlay {
+      pointer-events: auto;
+      opacity: 1;
+      animation: alarm-flash 0.35s ease-in-out infinite;
+    }
+
+    body.alarm .panel {
+      animation: alarm-shake 0.12s linear infinite;
+    }
+
+    @keyframes alarm-flash {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 0.25; }
+    }
+
+    @keyframes alarm-shake {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(-2px, 1px) rotate(-0.3deg); }
+      50% { transform: translate(2px, -1px) rotate(0.3deg); }
+      75% { transform: translate(-1px, -1px) rotate(-0.2deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    .alarm-stop {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 101;
+      display: none;
+      padding: 16px 32px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #0e0e13;
+      background: #8ff5ff;
+      border: none;
+      border-radius: 4px;
+      box-shadow: 0 0 40px rgba(143, 245, 255, 0.5);
+      cursor: pointer;
+      animation: alarm-stop-pulse 1s ease-in-out infinite;
+    }
+
+    body.alarm .alarm-stop {
+      display: block;
+    }
+
+    @keyframes alarm-stop-pulse {
+      50% { box-shadow: 0 0 56px rgba(143, 245, 255, 0.75); }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="alarm-overlay" id="alarmOverlay" aria-hidden="true"></div>
+  <button type="button" class="alarm-stop" id="alarmStop" hidden>Parar sirene</button>
+
+  <main class="panel" id="mainPanel" aria-labelledby="timerLabel">
+    <div class="panel__bg"></div>
+    <div class="panel__vignette"></div>
+    <span class="hud-corner hud-corner--tl"></span>
+    <span class="hud-corner hud-corner--tr"></span>
+    <span class="hud-corner hud-corner--bl"></span>
+    <span class="hud-corner hud-corner--br"></span>
+
+    <div class="panel__inner">
+      <div class="hud-label" id="timerLabel">
+        <span class="hud-label__line"></span>
+        CRONÔMETRO // FOCO
+        <span class="hud-label__line"></span>
+      </div>
+
+      <div class="panel__body">
+        <p class="time-display" id="timeDisplay" role="timer" aria-live="polite" aria-atomic="true">05:00</p>
+        <p class="sub" id="hintText">Escolha 3, 5 ou 10 minutos e pressione Iniciar. Ao zerar, a sirene toca até você parar.</p>
+
+        <div class="glass">
+          <div class="duration-row" role="group" aria-label="Duração">
+            <input type="radio" name="duration" id="d3" value="3" />
+            <label class="duration-btn" for="d3">3 min</label>
+            <input type="radio" name="duration" id="d5" value="5" checked />
+            <label class="duration-btn" for="d5">5 min</label>
+            <input type="radio" name="duration" id="d10" value="10" />
+            <label class="duration-btn" for="d10">10 min</label>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn btn--primary" id="btnStart">Iniciar</button>
+            <button type="button" class="btn btn--ghost" id="btnPause" disabled>Pausar</button>
+            <button type="button" class="btn btn--ghost" id="btnReset">Reiniciar</button>
+          </div>
+        </div>
+      </div>
+
+      <footer class="panel-footer">
+        <span class="brand">IA BUILDER</span>
+        <span class="status-chip" id="statusChip">Pronto</span>
+      </footer>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const MS = 1000;
+      const WARN_SEC = 60;
+      const CRITICAL_SEC = 10;
+
+      const timeDisplay = document.getElementById('timeDisplay');
+      const progressFill = document.getElementById('progressFill');
+      const btnStart = document.getElementById('btnStart');
+      const btnPause = document.getElementById('btnPause');
+      const btnReset = document.getElementById('btnReset');
+      const statusChip = document.getElementById('statusChip');
+      const durationInputs = document.querySelectorAll('input[name="duration"]');
+      const body = document.body;
+      const alarmStop = document.getElementById('alarmStop');
+
+      let selectedMinutes = 5;
+      let totalMs = selectedMinutes * 60 * MS;
+      let remainingMs = totalMs;
+      let tickId = null;
+      let running = false;
+      let alarmAudio = null;
+
+      function formatTime(ms) {
+        const s = Math.max(0, Math.ceil(ms / MS));
+        const m = Math.floor(s / 60);
+        const r = s % 60;
+        return String(m).padStart(2, '0') + ':' + String(r).padStart(2, '0');
+      }
+
+      function getSelectedMinutes() {
+        const c = document.querySelector('input[name="duration"]:checked');
+        return c ? parseInt(c.value, 10) : 5;
+      }
+
+      function setProgress() {
+        const p = totalMs > 0 ? remainingMs / totalMs : 0;
+        progressFill.style.transform = 'scaleX(' + p + ')';
+      }
+
+      function updateDisplayClasses() {
+        const sec = remainingMs / MS;
+        timeDisplay.classList.remove('time-display--warn', 'time-display--critical');
+        if (sec <= CRITICAL_SEC && sec > 0) {
+          timeDisplay.classList.add('time-display--critical');
+        } else if (sec <= WARN_SEC) {
+          timeDisplay.classList.add('time-display--warn');
+        }
+      }
+
+      function render() {
+        timeDisplay.textContent = formatTime(remainingMs);
+        setProgress();
+        updateDisplayClasses();
+      }
+
+      function setStatus(text) {
+        statusChip.textContent = text;
+      }
+
+      function stopAlarm() {
+        body.classList.remove('alarm');
+        if (alarmAudio) {
+          alarmAudio.stop();
+          alarmAudio = null;
+        }
+        alarmStop.hidden = true;
+      }
+
+      function startSiren() {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return { stop: function () {} };
+
+        const ctx = new Ctx();
+        const master = ctx.createGain();
+        master.gain.value = 0.22;
+        master.connect(ctx.destination);
+
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.Q.value = 0.8;
+        filter.frequency.value = 900;
+        osc.connect(filter);
+        filter.connect(master);
+        osc.start();
+
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 4;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 500;
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency);
+        lfo.start();
+
+        const toggle = setInterval(function () {
+          master.gain.setTargetAtTime(master.gain.value > 0.15 ? 0.08 : 0.26, ctx.currentTime, 0.05);
+        }, 280);
+
+        return {
+          stop: function () {
+            clearInterval(toggle);
+            try {
+              osc.stop();
+              lfo.stop();
+              ctx.close();
+            } catch (e) {}
+          }
+        };
+      }
+
+      function triggerAlarm() {
+        running = false;
+        clearInterval(tickId);
+        tickId = null;
+        btnStart.disabled = false;
+        btnPause.disabled = true;
+        remainingMs = 0;
+        render();
+        setStatus('Tempo esgotado');
+        body.classList.add('alarm');
+        alarmStop.hidden = false;
+        try {
+          if (alarmAudio) alarmAudio.stop();
+          alarmAudio = startSiren();
+        } catch (e) {}
+      }
+
+      function tick() {
+        remainingMs -= MS;
+        if (remainingMs <= 0) {
+          remainingMs = 0;
+          render();
+          triggerAlarm();
+          return;
+        }
+        render();
+      }
+
+      function applyDurationFromUI() {
+        selectedMinutes = getSelectedMinutes();
+        totalMs = selectedMinutes * 60 * MS;
+        remainingMs = totalMs;
+        render();
+      }
+
+      function onDurationChange() {
+        if (running) return;
+        applyDurationFromUI();
+      }
+
+      durationInputs.forEach(function (inp) {
+        inp.addEventListener('change', onDurationChange);
+      });
+
+      btnStart.addEventListener('click', function () {
+        stopAlarm();
+        if (!running) {
+          if (remainingMs <= 0) applyDurationFromUI();
+          running = true;
+          btnStart.disabled = true;
+          btnPause.disabled = false;
+          durationInputs.forEach(function (i) { i.disabled = true; });
+          setStatus('Em andamento');
+          try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (Ctx) {
+              const c = new Ctx();
+              if (c.state === 'suspended') c.resume().then(function () { c.close(); });
+              else c.close();
+            }
+          } catch (e) {}
+          tickId = setInterval(tick, MS);
+        }
+      });
+
+      btnPause.addEventListener('click', function () {
+        if (!running) return;
+        running = false;
+        clearInterval(tickId);
+        tickId = null;
+        btnStart.disabled = false;
+        btnPause.disabled = true;
+        durationInputs.forEach(function (i) { i.disabled = false; });
+        setStatus('Pausado');
+      });
+
+      btnReset.addEventListener('click', function () {
+        stopAlarm();
+        running = false;
+        clearInterval(tickId);
+        tickId = null;
+        btnStart.disabled = false;
+        btnPause.disabled = true;
+        durationInputs.forEach(function (i) { i.disabled = false; });
+        applyDurationFromUI();
+        setStatus('Pronto');
+      });
+
+      alarmStop.addEventListener('click', function () {
+        stopAlarm();
+        durationInputs.forEach(function (i) { i.disabled = false; });
+        applyDurationFromUI();
+        setStatus('Pronto');
+      });
+
+      applyDurationFromUI();
+    })();
+  </script>
+</body>
+</html>
