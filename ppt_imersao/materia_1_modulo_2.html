@@ -1,0 +1,699 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IA Builder · Matéria 01 Módulo 02 Primeiro Projeto, Cursor e Git</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body { background: #0a0a0f; color: #f9f5fd; font-family: 'Inter', sans-serif; position: relative; }
+
+    .stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; perspective: 2000px; }
+
+    .slide {
+      position: absolute;
+      width: min(1600px, 96vw);
+      height: min(900px, calc(96vw * 9 / 16), 92vh);
+      aspect-ratio: 16 / 9;
+      background: #0e0e13;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateX(100%) scale(0.9) rotateY(-18deg);
+      transition: transform 0.85s cubic-bezier(0.77, 0, 0.175, 1), opacity 0.6s ease;
+      pointer-events: none;
+    }
+    .slide.is-active { opacity: 1; transform: translateX(0) scale(1) rotateY(0); pointer-events: auto; }
+    .slide.is-prev { opacity: 0; transform: translateX(-100%) scale(0.9) rotateY(18deg); }
+
+    .slide__bg {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(143, 245, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(143, 245, 255, 0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      animation: gridDrift 40s linear infinite;
+    }
+    @keyframes gridDrift { from { background-position: 0 0, 0 0; } to { background-position: 60px 60px, 60px 60px; } }
+    .slide__vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 85% 75% at 50% 50%, transparent 0%, rgba(14, 14, 19, 0.88) 100%); }
+    .slide__scan { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, rgba(143, 245, 255, 0.04) 50%, transparent 100%); mix-blend-mode: screen; pointer-events: none; transform: translateY(-100%); }
+    .slide.is-active .slide__scan { animation: scan 3.5s ease-in-out infinite; }
+    @keyframes scan { 0% { transform: translateY(-100%); } 60% { transform: translateY(100%); } 100% { transform: translateY(100%); } }
+
+    .hud-corner { position: absolute; width: 28px; height: 28px; border-color: rgba(143, 245, 255, 0.45); z-index: 2; pointer-events: none; }
+    .hud-corner--tl { top: 36px; left: 36px; border-top: 2px solid; border-left: 2px solid; }
+    .hud-corner--tr { top: 36px; right: 36px; border-top: 2px solid; border-right: 2px solid; }
+    .hud-corner--bl { bottom: 36px; left: 36px; border-bottom: 2px solid; border-left: 2px solid; }
+    .hud-corner--br { bottom: 36px; right: 36px; border-bottom: 2px solid; border-right: 2px solid; }
+    .slide.is-active .hud-corner { animation: cornerPulse 3s ease-in-out infinite; }
+    @keyframes cornerPulse { 0%, 100% { border-color: rgba(143, 245, 255, 0.45); } 50% { border-color: rgba(143, 245, 255, 0.85); box-shadow: 0 0 12px rgba(143, 245, 255, 0.25); } }
+
+    .slide__inner { position: relative; z-index: 1; height: 100%; padding: 56px 72px 48px; display: flex; flex-direction: column; }
+    .slide__body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; width: 100%; gap: 24px; }
+
+    .hud-label { font-size: 10px; font-weight: 700; letter-spacing: 0.28em; text-transform: uppercase; color: #8ff5ff; opacity: 0.75; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; flex-shrink: 0; }
+    .hud-label__line { display: block; width: 40px; height: 1px; background: #8ff5ff; opacity: 0.55; }
+
+    .icon-wrap { width: 160px; height: 160px; position: relative; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(0.6); }
+    .slide.is-active .icon-wrap { animation: iconIn 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards; }
+    @keyframes iconIn { to { opacity: 1; transform: scale(1); } }
+    .icon-wrap::before, .icon-wrap::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(143, 245, 255, 0.25); border-radius: 50%; }
+    .icon-wrap::after { inset: -20px; border-style: dashed; border-color: rgba(143, 245, 255, 0.18); animation: spin 18s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .icon-wrap i { font-size: 72px; color: #8ff5ff; filter: drop-shadow(0 0 18px rgba(143, 245, 255, 0.55)); z-index: 2; }
+    .icon-wrap .icon-bg-glow { position: absolute; inset: 10px; background: radial-gradient(circle at 50% 50%, rgba(143, 245, 255, 0.25) 0%, transparent 70%); border-radius: 50%; animation: pulseGlow 2.4s ease-in-out infinite; }
+    @keyframes pulseGlow { 0%, 100% { opacity: 0.6; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.05); } }
+
+    .icon-compose { width: 280px; height: 160px; position: relative; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(0.6); }
+    .slide.is-active .icon-compose { animation: iconIn 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards; }
+    .icon-compose .ic { position: absolute; width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; background: rgba(19, 19, 25, 0.8); border: 1px solid rgba(143, 245, 255, 0.3); border-radius: 4px; backdrop-filter: blur(12px); }
+    .icon-compose .ic i { font-size: 40px; color: #8ff5ff; filter: drop-shadow(0 0 10px rgba(143, 245, 255, 0.55)); }
+    .icon-compose .ic--accent { background: linear-gradient(135deg, #ff9f43 0%, #f25c05 100%); border-color: rgba(255, 122, 26, 0.6); }
+    .icon-compose .ic--accent i { color: #fff; filter: drop-shadow(0 0 10px rgba(255, 122, 26, 0.7)); }
+    .ic--a { transform: translate(-90px, -8px) rotate(-8deg); }
+    .ic--b { transform: translate(0, 14px); }
+    .ic--c { transform: translate(90px, -8px) rotate(8deg); }
+    .ic--left { transform: translate(-55px, 0); }
+    .ic--right { transform: translate(55px, 0); }
+
+    .headline { font-family: 'Space Grotesk', sans-serif; font-weight: 700; line-height: 1.05; color: #f9f5fd; text-shadow: 0 0 18px rgba(143, 245, 255, 0.35); text-align: center; max-width: 1100px; opacity: 0; transform: translateY(30px); }
+    .slide.is-active .headline { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.55s forwards; }
+    .headline--xl { font-size: 64px; letter-spacing: -0.02em; }
+    .headline--lg { font-size: 50px; letter-spacing: -0.02em; }
+    .headline--md { font-size: 40px; letter-spacing: -0.02em; }
+    .headline--accent { color: #8ff5ff; background: linear-gradient(135deg, #8ff5ff 0%, #c47fff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+    .sub { font-size: 22px; line-height: 1.5; color: rgba(249, 245, 253, 0.8); font-weight: 400; max-width: 980px; margin-left: auto; margin-right: auto; text-align: center; opacity: 0; transform: translateY(30px); }
+    .slide.is-active .sub { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.75s forwards; }
+    .sub strong { color: #f9f5fd; font-weight: 600; }
+    .sub code { font-family: 'JetBrains Mono', monospace; background: rgba(143, 245, 255, 0.1); border: 1px solid rgba(143, 245, 255, 0.3); color: #8ff5ff; padding: 3px 10px; border-radius: 4px; font-size: 0.92em; font-weight: 500; }
+    @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+    .chip-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; opacity: 0; transform: translateY(20px); }
+    .slide.is-active .chip-row { animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.95s forwards; }
+    .chip { background: rgba(143, 245, 255, 0.08); border: 1px solid rgba(143, 245, 255, 0.22); color: #8ff5ff; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; border-radius: 2px; padding: 7px 14px; }
+    .chip--purple { background: rgba(196, 127, 255, 0.1); border-color: rgba(196, 127, 255, 0.35); color: #c47fff; }
+    .chip--orange { background: rgba(255, 122, 26, 0.12); border-color: rgba(255, 122, 26, 0.4); color: #ff9f43; }
+
+    .glass { background: rgba(19, 19, 25, 0.65); backdrop-filter: blur(20px); border: 1px solid rgba(143, 245, 255, 0.12); border-radius: 4px; padding: 22px 28px; width: 100%; max-width: 960px; text-align: left; opacity: 0; transform: translateY(30px); }
+    .slide.is-active .glass { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.85s forwards; }
+
+    .terminal { font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #8ff5ff; background: rgba(10, 10, 15, 0.9); border: 1px solid rgba(143, 245, 255, 0.2); border-radius: 4px; padding: 18px 22px; width: 100%; max-width: 820px; text-align: left; display: flex; align-items: center; gap: 12px; opacity: 0; transform: translateY(30px); }
+    .slide.is-active .terminal { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.85s forwards; }
+    .terminal::before { content: '$'; color: #ff9f43; font-weight: 700; }
+    .terminal .cursor { display: inline-block; width: 10px; height: 20px; background: #8ff5ff; vertical-align: middle; animation: blink 1s steps(2, start) infinite; margin-left: 4px; }
+    @keyframes blink { to { visibility: hidden; } }
+
+    .prompt-box { font-family: 'JetBrains Mono', monospace; font-size: 15px; line-height: 1.65; color: rgba(249, 245, 253, 0.88); background: rgba(10, 10, 15, 0.88); border-left: 3px solid #8ff5ff; padding: 18px 22px; text-align: left; max-width: 960px; width: 100%; opacity: 0; transform: translateY(30px); white-space: pre-wrap; }
+    .slide.is-active .prompt-box { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.85s forwards; }
+    .prompt-box .comment { color: #8ff5ff; font-style: italic; }
+    .prompt-box .kw { color: #ff9f43; font-weight: 600; }
+    .prompt-box .str { color: #c47fff; }
+
+    .bullet-list { list-style: none; width: 100%; max-width: 960px; margin: 0 auto; opacity: 0; transform: translateY(30px); }
+    .slide.is-active .bullet-list { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.85s forwards; }
+    .bullet-list li { display: flex; align-items: flex-start; gap: 14px; font-size: 20px; line-height: 1.5; color: #acaab1; margin-bottom: 12px; text-align: left; }
+    .bullet-list li:last-child { margin-bottom: 0; }
+    .bullet-list__mark { flex-shrink: 0; width: 8px; height: 8px; margin-top: 10px; background: #8ff5ff; box-shadow: 0 0 12px rgba(143, 245, 255, 0.6); border-radius: 1px; }
+    .bullet-list strong { color: #f9f5fd; font-weight: 600; }
+    .bullet-list i { color: #8ff5ff; margin-right: 4px; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 1040px; opacity: 0; transform: translateY(30px); }
+    .slide.is-active .two-col { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.85s forwards; }
+    .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; max-width: 1100px; opacity: 0; transform: translateY(30px); }
+    .slide.is-active .three-col { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.85s forwards; }
+    .mini-glass { background: rgba(31, 31, 38, 0.85); border: 1px solid rgba(143, 245, 255, 0.12); border-radius: 4px; padding: 18px 22px; color: #acaab1; line-height: 1.4; text-align: left; font-size: 16px; }
+    .mini-glass strong { display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', sans-serif; color: #8ff5ff; font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; font-weight: 700; }
+    .mini-glass i { font-size: 14px; color: #ff9f43; }
+
+    .slide-footer { display: flex; align-items: center; justify-content: space-between; gap: 56px; padding-top: 20px; border-top: 1px solid rgba(143, 245, 255, 0.08); width: 100%; flex-shrink: 0; }
+    .brand { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.2em; text-transform: uppercase; color: #8ff5ff; display: flex; align-items: center; gap: 10px; }
+    .brand .dot { width: 8px; height: 8px; background: #8ff5ff; border-radius: 1px; box-shadow: 0 0 8px rgba(143, 245, 255, 0.8); animation: pulseDot 1.6s ease-in-out infinite; }
+    @keyframes pulseDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .slide-index { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0.18em; color: rgba(172, 170, 177, 0.85); }
+
+    .nav { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; z-index: 10; background: rgba(19, 19, 25, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(143, 245, 255, 0.15); border-radius: 999px; padding: 8px 14px; }
+    .nav button { width: 38px; height: 38px; border-radius: 50%; background: rgba(143, 245, 255, 0.08); border: 1px solid rgba(143, 245, 255, 0.25); color: #8ff5ff; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+    .nav button:hover { background: rgba(143, 245, 255, 0.2); color: #fff; box-shadow: 0 0 14px rgba(143, 245, 255, 0.4); }
+    .nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+    .nav__counter { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.2em; color: #8ff5ff; min-width: 60px; text-align: center; }
+    .dots { display: flex; gap: 5px; margin: 0 6px; max-width: 220px; overflow: hidden; }
+    .dots span { width: 5px; height: 5px; border-radius: 50%; background: rgba(143, 245, 255, 0.25); transition: all 0.3s ease; flex-shrink: 0; }
+    .dots span.active { background: #8ff5ff; box-shadow: 0 0 8px rgba(143, 245, 255, 0.8); transform: scale(1.4); }
+
+    .progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: rgba(143, 245, 255, 0.08); z-index: 20; }
+    .progress__fill { height: 100%; background: linear-gradient(90deg, #8ff5ff 0%, #c47fff 100%); box-shadow: 0 0 12px rgba(143, 245, 255, 0.6); transition: width 0.6s cubic-bezier(0.77, 0, 0.175, 1); width: 0%; }
+
+    .key-hint { position: fixed; top: 18px; right: 24px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: rgba(172, 170, 177, 0.6); letter-spacing: 0.1em; z-index: 10; }
+    .key-hint kbd { background: rgba(143, 245, 255, 0.1); border: 1px solid rgba(143, 245, 255, 0.25); border-radius: 3px; padding: 2px 6px; color: #8ff5ff; margin: 0 2px; }
+
+    @media (max-width: 900px) {
+      .slide__inner { padding: 40px 32px 28px; }
+      .headline--xl { font-size: 40px; }
+      .headline--lg { font-size: 32px; }
+      .headline--md { font-size: 26px; }
+      .sub { font-size: 15px; }
+      .icon-wrap { width: 110px; height: 110px; }
+      .icon-wrap i { font-size: 52px; }
+      .terminal, .prompt-box { font-size: 13px; }
+      .bullet-list li { font-size: 15px; }
+      .three-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="progress"><div class="progress__fill" id="progressFill"></div></div>
+
+  <div class="key-hint"><kbd>←</kbd> <kbd>→</kbd> navegar · <kbd>Space</kbd> próximo</div>
+
+  <div class="stage" id="stage">
+
+    <!-- 01 CAPA -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>MATÉRIA 01 // MÓDULO 02<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-compose">
+            <div class="ic ic--a"><i class="fa-solid fa-i-cursor"></i></div>
+            <div class="ic ic--accent ic--b"><i class="fa-brands fa-github"></i></div>
+            <div class="ic ic--c"><i class="fa-solid fa-code-branch"></i></div>
+          </div>
+          <h1 class="headline headline--xl">Primeiro projeto no <span class="headline--accent">Cursor</span></h1>
+          <p class="sub">Do prompt ao currículo publicado: <strong>plugins</strong>, execução local, <strong>Git</strong> e <strong>GitHub</strong> para versionar e colocar seu projeto no ar.</p>
+          <div class="chip-row"><span class="chip">CURSOR</span><span class="chip chip--purple">GIT</span><span class="chip chip--orange">GITHUB</span></div>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">01</span></footer>
+      </div>
+    </section>
+
+    <!-- 02 Primeiro projeto no cursor -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>INÍCIO // CURSOR<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-folder-open"></i></div>
+          <h1 class="headline headline--lg">Primeiro projeto no <span class="headline--accent">Cursor</span></h1>
+          <p class="sub">Abra uma pasta de trabalho, conheça o layout (explorer, chat, terminal) e entenda que <strong>tudo gira em torno dos arquivos do projeto</strong> na sua máquina.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span>Crie ou abra uma <strong>pasta vazia</strong> dedicada ao curso.</span></li>
+            <li><span class="bullet-list__mark"></span><span>Use o chat da IA com o <strong>contexto do workspace</strong> ligado.</span></li>
+            <li><span class="bullet-list__mark"></span><span>Salve arquivos com extensão correta (<code>.html</code>, <code>.css</code>…).</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">02</span></footer>
+      </div>
+    </section>
+
+    <!-- 03 Prompts: idioma -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>PROMPTS // IDIOMA<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-language"></i></div>
+          <h1 class="headline headline--md">Prompts: o idioma para conversar com a <span class="headline--accent">IA</span></h1>
+          <p class="sub">Escreva em <strong>português claro</strong> se for seu idioma de trabalho: a IA entende e gera código. O que importa é <strong>ser específico</strong> sobre objetivo, público e restrições.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span><strong>Contexto:</strong> quem vai usar e em qual dispositivo.</span></li>
+            <li><span class="bullet-list__mark"></span><span><strong>Entregável:</strong> “uma página HTML única”, “sem framework”, etc.</span></li>
+            <li><span class="bullet-list__mark"></span><span><strong>Tom visual:</strong> cores, estilo (minimalista, corporativo…).</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">03</span></footer>
+      </div>
+    </section>
+
+    <!-- 04 Projeto currículo -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>PROJETO // CURRÍCULO<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-file-lines"></i></div>
+          <h1 class="headline headline--md">Primeiro projeto: <span class="headline--accent">currículo</span></h1>
+          <p class="sub">Um <strong>site currículo em HTML/CSS</strong> é o projeto ideal: é visual, cabe em poucos arquivos e você publica depois no GitHub Pages.</p>
+          <div class="two-col">
+            <div class="mini-glass"><strong><i class="fa-solid fa-list"></i>Estrutura</strong>Seções: cabeçalho, experiência, formação, habilidades, contato.</div>
+            <div class="mini-glass"><strong><i class="fa-solid fa-palette"></i>Visual</strong>Tipografia legível, contraste e layout responsivo simples.</div>
+          </div>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">04</span></footer>
+      </div>
+    </section>
+
+    <!-- 05 Técnicas currículo -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>REFINO // CURRÍCULO<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-sliders"></i></div>
+          <h1 class="headline headline--md">Técnicas para ajustar o <span class="headline--accent">currículo</span></h1>
+          <p class="sub">Peça ajustes em <strong>iterações pequenas</strong>: uma seção por vez, ou “deixe o hero mais compacto”. Compare versões e mantenha o que funcionar.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span><strong>Copie/cole seu texto real</strong> e peça reformatação, não inventar carreira.</span></li>
+            <li><span class="bullet-list__mark"></span><span>Pedidos do tipo: “reduzir texto em 30%”, “alinhar à vaga X”.</span></li>
+            <li><span class="bullet-list__mark"></span><span>Peça <strong>checklist de acessibilidade</strong> (contraste, headings).</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">05</span></footer>
+      </div>
+    </section>
+
+    <!-- 06 Prompt assertivo -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>PROMPTS // ASSERTIVIDADE<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-bullseye"></i></div>
+          <h1 class="headline headline--md">Técnicas para ser mais assertivo no <span class="headline--accent">prompt</span></h1>
+          <p class="sub">Prompt bom = <strong>resultado mensurável</strong>. Use formato, exemplos e limites. Se a IA errar, mande o <strong>erro exato</strong> ou um print do comportamento.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span><strong>Role + tarefa:</strong> “Atue como front-end e crie…”</span></li>
+            <li><span class="bullet-list__mark"></span><span><strong>Restrições:</strong> “sem bibliotecas externas”, “apenas uma página”.</span></li>
+            <li><span class="bullet-list__mark"></span><span><strong>Critério de pronto:</strong> “deve funcionar ao abrir o HTML no navegador”.</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">06</span></footer>
+      </div>
+    </section>
+
+    <!-- 07 Rodando o projeto -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>EXECUÇÃO // NAVEGADOR<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-play"></i></div>
+          <h1 class="headline headline--md">Rodando o <span class="headline--accent">projeto</span></h1>
+          <p class="sub">HTML estático pode abrir direto no navegador; para evitar limitações de alguns recursos, use um <strong>servidor local</strong> (plugin Live Server ou comando simples).</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span>Arquivo principal: normalmente <code>index.html</code>.</span></li>
+            <li><span class="bullet-list__mark"></span><span>Atualize a página após salvar; plugins podem <strong>recarregar automaticamente</strong>.</span></li>
+            <li><span class="bullet-list__mark"></span><span>Console do navegador (F12) mostra erros de JS ou caminhos quebrados.</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">07</span></footer>
+      </div>
+    </section>
+
+    <!-- 08 Plugins -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>CURSOR // PLUGINS<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-puzzle-piece"></i></div>
+          <h1 class="headline headline--md">Plugins no Cursor</h1>
+          <p class="sub">Extensões que aceleram o fluxo: pré-visualização, integração com modelos e ferramentas na nuvem.</p>
+          <div class="three-col">
+            <div class="mini-glass"><strong><i class="fa-solid fa-server"></i>Live Server</strong>Sobe um servidor local e recarrega ao salvar — ideal para HTML/CSS.</div>
+            <div class="mini-glass"><strong><i class="fa-solid fa-robot"></i>Codex</strong>Integração com agentes OpenAI no ecossistema do editor.</div>
+            <div class="mini-glass"><strong><i class="fa-solid fa-cloud"></i>Cloud Code</strong>Conecta fluxos e recursos na nuvem conforme sua stack (nome pode variar no marketplace).</div>
+          </div>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">08</span></footer>
+      </div>
+    </section>
+
+    <!-- 09 Local para nuvem -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>FLUXO // LOCAL → NUVEM<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-cloud-arrow-up"></i></div>
+          <h1 class="headline headline--md">Da máquina local para a <span class="headline--accent">nuvem</span></h1>
+          <p class="sub">No seu computador o projeto é só <strong>arquivos em pasta</strong>. Na nuvem (GitHub) ele vira <strong>repositório</strong>: backup, histórico e base para publicar o site.</p>
+          <div class="two-col">
+            <div class="mini-glass"><strong><i class="fa-solid fa-laptop"></i>Local</strong>Edição rápida, testes no navegador, sem depender de internet.</div>
+            <div class="mini-glass"><strong><i class="fa-solid fa-cloud"></i>Nuvem</strong>Compartilhamento, CI/CD leve, GitHub Pages para o currículo online.</div>
+          </div>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">09</span></footer>
+      </div>
+    </section>
+
+    <!-- 10 Por que versões -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>VERSÕES // MOTIVAÇÃO<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-clock-rotate-left"></i></div>
+          <h1 class="headline headline--md">Por que criar <span class="headline--accent">versões</span> do seu projeto?</h1>
+          <p class="sub">Sem versionamento, você só tem a pasta “de agora”. Com commits, cada mudança fica <strong>registrada</strong>: volta atrás, compara, colabora sem medo.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span><strong>Segurança:</strong> desfazer uma alteração que quebrou o layout.</span></li>
+            <li><span class="bullet-list__mark"></span><span><strong>Histórico:</strong> ver o que mudou e por quê.</span></li>
+            <li><span class="bullet-list__mark"></span><span><strong>Publicação:</strong> GitHub usa o estado do repo para servir o site.</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">10</span></footer>
+      </div>
+    </section>
+
+    <!-- 11 Git e GitHub o que é -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>FUNDAMENTO // GIT &amp; GITHUB<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-book"></i></div>
+          <h1 class="headline headline--md">Git e GitHub: o que é, para que serve e como <span class="headline--accent">funciona</span>?</h1>
+          <p class="sub"><strong>Git</strong> é o sistema de controle de versão na sua máquina. <strong>GitHub</strong> é o serviço online que hospeda cópias do repositório e ferramentas em volta (issues, Pages, Actions).</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span>Fluxo mental: <strong>editar → commitar → enviar (push)</strong> para a nuvem.</span></li>
+            <li><span class="bullet-list__mark"></span><span>O histórico é um grafo de <strong>commits</strong>, não um único arquivo “final”.</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">11</span></footer>
+      </div>
+    </section>
+
+    <!-- 12 Git x GitHub -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>COMPARATIVO // GIT × GITHUB<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-code-compare"></i></div>
+          <h1 class="headline headline--md"><span class="headline--accent">Git</span> × <span class="headline--accent">GitHub</span></h1>
+          <div class="two-col">
+            <div class="mini-glass"><strong><i class="fa-solid fa-terminal"></i>Git (local)</strong>Ferramenta de linha de comando ou integrada na IDE. Roda no seu disco. Funciona até offline (commits locais).</div>
+            <div class="mini-glass"><strong><i class="fa-brands fa-github"></i>GitHub (remoto)</strong>Hospedagem + colaboração. “Origin” é o servidor onde você envia e puxa alterações.</div>
+          </div>
+          <p class="sub">Analogia: Git é o <strong>motor</strong>; GitHub é a <strong>garagem na internet</strong> onde o carro também fica guardado.</p>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">12</span></footer>
+      </div>
+    </section>
+
+    <!-- 13 Conta GitHub -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>GITHUB // CONTA<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-user-plus"></i></div>
+          <h1 class="headline headline--md">Criando uma conta no <span class="headline--accent">GitHub</span></h1>
+          <p class="sub">Cadastro gratuito, username público (URL do seu perfil) e e-mail para recuperação. Ative <strong>2FA</strong> quando possível para segurança.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span>Escolha um <strong>username</strong> profissional — aparece em links de portfólio.</span></li>
+            <li><span class="bullet-list__mark"></span><span>Confirme o e-mail antes de criar o primeiro repositório.</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">13</span></footer>
+      </div>
+    </section>
+
+    <!-- 14 Por dentro GitHub -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>GITHUB // INTERFACE<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-compass"></i></div>
+          <h1 class="headline headline--md">Por dentro do <span class="headline--accent">GitHub</span></h1>
+          <p class="sub">Navegue por <strong>repositório</strong>, lista de arquivos, commits, branches e configurações. O botão verde <strong>Code</strong> mostra a URL para clonar.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span><strong>README.md</strong> aparece na página inicial do repo.</span></li>
+            <li><span class="bullet-list__mark"></span><span><strong>Settings</strong>: visibilidade, GitHub Pages, colaboradores.</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">14</span></footer>
+      </div>
+    </section>
+
+    <!-- 15 Instalar Git -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>SETUP // GIT<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-download"></i></div>
+          <h1 class="headline headline--md">Baixando e instalando o <span class="headline--accent">Git</span></h1>
+          <p class="sub">No macOS use o instalador oficial ou Xcode Command Line Tools. Depois confira no terminal: <code>git --version</code>.</p>
+          <div class="terminal">git --version<span class="cursor"></span></div>
+          <p class="sub">Instale também as <strong>ferramentas de merge</strong> se o instalador oferecer; ajudam em conflitos futuros.</p>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">15</span></footer>
+      </div>
+    </section>
+
+    <!-- 16 Config Git no Cursor -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>CONFIG // GIT<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-gear"></i></div>
+          <h1 class="headline headline--md">Configurando o Git no <span class="headline--accent">Cursor</span></h1>
+          <p class="sub">Defina <strong>user.name</strong> e <strong>user.email</strong> iguais aos do GitHub (e-mail principal ou o privado do GitHub). Isso assina seus commits.</p>
+          <div class="prompt-box"><span class="kw">git config</span> --global user.name <span class="str">"Seu Nome"</span>
+<span class="kw">git config</span> --global user.email <span class="str">"seu@email.com"</span></div>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">16</span></footer>
+      </div>
+    </section>
+
+    <!-- 17 Integrar Git -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>CURSOR // INTEGRAÇÃO<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-link"></i></div>
+          <h1 class="headline headline--md">Integrando o Git no <span class="headline--accent">Cursor</span></h1>
+          <p class="sub">A aba <strong>Source Control</strong> mostra arquivos modificados. Você pode <strong>inicializar</strong> o repositório, fazer stage, commit e sincronizar com o remoto sem sair do editor.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span><strong>Initialize Repository</strong> na pasta do projeto (primeira vez).</span></li>
+            <li><span class="bullet-list__mark"></span><span>Autenticação GitHub: token (PAT) ou GitHub CLI — conforme o fluxo que adotarmos na aula.</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">17</span></footer>
+      </div>
+    </section>
+
+    <!-- 18 Commit push pull -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>GIT // CONCEITOS<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-code-branch"></i></div>
+          <h1 class="headline headline--md">Conceitos principais: <span class="headline--accent">Commit</span>, <span class="headline--accent">Push</span> e <span class="headline--accent">Pull</span></h1>
+          <div class="three-col">
+            <div class="mini-glass"><strong><i class="fa-solid fa-box-archive"></i>Commit</strong>Foto do estado atual dos arquivos, com mensagem. Fica no histórico local (e depois no remoto).</div>
+            <div class="mini-glass"><strong><i class="fa-solid fa-arrow-up"></i>Push</strong>Envia seus commits locais para o GitHub (atualiza o remoto).</div>
+            <div class="mini-glass"><strong><i class="fa-solid fa-arrow-down"></i>Pull</strong>Traz alterações do remoto para sua máquina (útil em time ou outro computador).</div>
+          </div>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">18</span></footer>
+      </div>
+    </section>
+
+    <!-- 19 Primeiro commit -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>PRÁTICA // COMMIT<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-flag-checkered"></i></div>
+          <h1 class="headline headline--md">Fazendo o primeiro <span class="headline--accent">commit</span></h1>
+          <p class="sub">Adicione arquivos ao stage, escreva uma mensagem clara (ex.: “Currículo: estrutura inicial”) e confirme. Esse é o marco zero do histórico.</p>
+          <div class="prompt-box"><span class="kw">git add</span> .
+<span class="kw">git commit</span> -m <span class="str">"feat: currículo HTML inicial"</span></div>
+          <p class="sub">Boas mensagens: <strong>imperativo</strong>, curtas, descrevendo o que mudou — não “ajustes” vago.</p>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">19</span></footer>
+      </div>
+    </section>
+
+    <!-- 20 Parabéns no ar -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>CONQUISTA // PUBLICAÇÃO<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-champagne-glasses"></i></div>
+          <h1 class="headline headline--md">Parabéns! O seu primeiro projeto está <span class="headline--accent">no ar</span></h1>
+          <p class="sub">Com repositório público e <strong>GitHub Pages</strong> (ou fluxo equivalente), seu currículo ganha uma <strong>URL compartilhável</strong> — vitrine real do que você construiu com IA.</p>
+          <div class="chip-row"><span class="chip">DEPLOY</span><span class="chip chip--purple">PAGES</span><span class="chip chip--orange">PORTFÓLIO</span></div>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">20</span></footer>
+      </div>
+    </section>
+
+    <!-- 21 Ajustes -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>EVOLUÇÃO // AJUSTES<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-wrench"></i></div>
+          <h1 class="headline headline--md">Ajustes do <span class="headline--accent">projeto</span></h1>
+          <p class="sub">Iteração contínua: corrija textos, melhore responsividade, otimize imagens. Cada rodada pode ser um <strong>novo commit</strong> — pequeno e frequente vence mudança gigante de uma vez.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span>Teste no celular e no desktop antes de dar push.</span></li>
+            <li><span class="bullet-list__mark"></span><span>Commits atômicos: uma ideia por commit quando possível.</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">21</span></footer>
+      </div>
+    </section>
+
+    <!-- 22 Voltando no tempo -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>HISTÓRICO // GIT<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-backward"></i></div>
+          <h1 class="headline headline--md">Voltando no tempo com o <span class="headline--accent">Git</span></h1>
+          <p class="sub">O histórico permite <strong>inspecionar commits antigos</strong>, comparar versões e, com cuidado, reverter alterações. Na IDE você vê a timeline; na linha de comando, <code>git log</code> e comandos de checkout/revert.</p>
+          <ul class="bullet-list">
+            <li><span class="bullet-list__mark"></span><span>Preferir <strong>revert</strong> em trabalho compartilhado (não reescreve histórico público).</span></li>
+            <li><span class="bullet-list__mark"></span><span>Branches ajudam a experimentar sem medo antes de fundir na principal.</span></li>
+          </ul>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">22</span></footer>
+      </div>
+    </section>
+
+    <!-- 23 Subindo para GitHub -->
+    <section class="slide">
+      <div class="slide__bg"></div><div class="slide__vignette"></div><div class="slide__scan"></div>
+      <span class="hud-corner hud-corner--tl"></span><span class="hud-corner hud-corner--tr"></span><span class="hud-corner hud-corner--bl"></span><span class="hud-corner hud-corner--br"></span>
+      <div class="slide__inner">
+        <div class="hud-label"><span class="hud-label__line"></span>NUVEM // GITHUB<span class="hud-label__line"></span></div>
+        <div class="slide__body">
+          <div class="icon-wrap"><div class="icon-bg-glow"></div><i class="fa-solid fa-rocket"></i></div>
+          <h1 class="headline headline--md">Subindo o projeto para a nuvem (<span class="headline--accent">GitHub</span>)</h1>
+          <p class="sub">Crie o repositório vazio no GitHub, adicione o <strong>remote</strong>, faça <strong>push</strong> da branch principal. O código local e o remoto ficam sincronizados.</p>
+          <div class="prompt-box"><span class="kw">git remote add</span> origin <span class="str">https://github.com/usuario/repo.git</span>
+<span class="kw">git push</span> -u origin main</div>
+          <p class="sub">Se a branch padrão for <code>master</code>, adapte o nome; o GitHub hoje costuma usar <code>main</code>.</p>
+        </div>
+        <footer class="slide-footer"><span class="brand"><span class="dot"></span>IA BUILDER</span><span class="slide-index">23</span></footer>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="nav">
+    <button id="prevBtn" aria-label="Slide anterior"><i class="fa-solid fa-chevron-left"></i></button>
+    <div class="dots" id="dots"></div>
+    <span class="nav__counter" id="counter">01 / 23</span>
+    <button id="nextBtn" aria-label="Próximo slide"><i class="fa-solid fa-chevron-right"></i></button>
+  </div>
+
+  <script>
+    (function () {
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const total = slides.length;
+      slides.forEach((s, i) => {
+        const idx = s.querySelector('.slide-index');
+        if (idx) idx.textContent = String(i + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
+        s.setAttribute('aria-label', 'Slide ' + (i + 1) + ' de ' + total);
+      });
+
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const counter = document.getElementById('counter');
+      const dotsEl = document.getElementById('dots');
+      const progressFill = document.getElementById('progressFill');
+      let current = 0, locked = false;
+
+      for (let i = 0; i < total; i++) {
+        const d = document.createElement('span');
+        d.addEventListener('click', () => goTo(i));
+        dotsEl.appendChild(d);
+      }
+      const dots = Array.from(dotsEl.children);
+
+      function render() {
+        slides.forEach((s, i) => {
+          s.classList.remove('is-active', 'is-prev');
+          if (i === current) s.classList.add('is-active');
+          else if (i < current) s.classList.add('is-prev');
+        });
+        dots.forEach((d, i) => d.classList.toggle('active', i === current));
+        counter.textContent = String(current + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
+        progressFill.style.width = ((current + 1) / total * 100) + '%';
+        prevBtn.disabled = current === 0;
+        nextBtn.disabled = current === total - 1;
+      }
+
+      function goTo(idx) {
+        if (locked) return;
+        if (idx < 0 || idx >= total) return;
+        locked = true;
+        current = idx;
+        render();
+        setTimeout(() => { locked = false; }, 650);
+      }
+      const next = () => goTo(current + 1);
+      const prev = () => goTo(current - 1);
+
+      prevBtn.addEventListener('click', prev);
+      nextBtn.addEventListener('click', next);
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); next(); }
+        else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+        else if (e.key === 'Home') { goTo(0); }
+        else if (e.key === 'End') { goTo(total - 1); }
+      });
+
+      let touchStartX = 0;
+      document.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].clientX; }, { passive: true });
+      document.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        if (Math.abs(dx) > 60) { dx < 0 ? next() : prev(); }
+      }, { passive: true });
+
+      let wheelLock = false;
+      document.addEventListener('wheel', (e) => {
+        if (wheelLock) return;
+        if (Math.abs(e.deltaY) < 30 && Math.abs(e.deltaX) < 30) return;
+        wheelLock = true;
+        if (e.deltaY > 0 || e.deltaX > 0) next(); else prev();
+        setTimeout(() => { wheelLock = false; }, 900);
+      }, { passive: true });
+
+      render();
+    })();
+  </script>
+
+</body>
+</html>
